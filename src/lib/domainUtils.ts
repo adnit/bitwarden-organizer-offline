@@ -8,9 +8,9 @@ export function extractBaseDomain(uri: string): string | null {
   if (!uri) return null;
 
   try {
-    // Handle URIs that may lack a protocol
+    // Handle URIs that may lack a protocol. If it doesn't start with a valid scheme like http:// or android://
     let normalizedUri = uri.trim();
-    if (!/^https?:\/\//i.test(normalizedUri)) {
+    if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(normalizedUri)) {
       if (!normalizedUri.startsWith('//')) {
         normalizedUri = 'https://' + normalizedUri;
       } else {

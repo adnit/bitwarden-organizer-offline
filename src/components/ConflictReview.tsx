@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, User, Key, Globe, SkipForward, LayoutGrid, ListChecks, Settings2 } from 'lucide-react';
+import { Check, Copy, User, Key, Globe, SkipForward, LayoutGrid, ListChecks, Settings2, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -73,11 +73,10 @@ function ConflictCard({
   onUpdate: (updated: ConflictGroup) => void;
   onManualResolve: (group: ConflictGroup) => void;
 }) {
-  const [resolution, setResolution] = useState<ConflictResolution>(group.resolution);
+  const resolution = group.resolution;
 
-  const setRes = (r: ConflictResolution) => {
-    setResolution(r);
-    onUpdate({ ...group, resolution: r, resolvedItem: r === 'keep-a' ? group.items[0] : r === 'keep-b' ? group.items[1] : null });
+  const setRes = (r: ConflictResolution, item?: VaultItem) => {
+    onUpdate({ ...group, resolution: r, resolvedItem: item || null });
   };
 
   const isPending = resolution === 'pending';
@@ -86,18 +85,18 @@ function ConflictCard({
     <Card
       className={cn(
         'animate-fade-in border',
-        isPending ? 'border-amber-500/30' : resolution === 'skipped' ? 'border-muted' : resolution === 'custom' ? 'border-primary/40' : 'border-green-500/30',
+        isPending ? 'border-amber-500/30' : resolution === 'skipped' ? 'border-muted' : resolution === 'delete-all' ? 'border-destructive/40 bg-destructive/5' : resolution === 'custom' ? 'border-primary/40' : 'border-green-500/30',
       )}
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
           <Badge
-            variant={isPending ? 'warning' : resolution === 'skipped' ? 'secondary' : 'success'}
+            variant={isPending ? 'warning' : resolution === 'skipped' ? 'secondary' : resolution === 'delete-all' ? 'destructive' : 'success'}
           >
-            {isPending ? 'Pending' : resolution === 'skipped' ? 'Skipped' : resolution === 'custom' ? 'Custom Fixed' : 'Resolved'}
+            {isPending ? 'Pending' : resolution === 'skipped' ? 'Skipped' : resolution === 'delete-all' ? 'Deleted' : resolution === 'custom' ? 'Custom Fixed' : 'Resolved'}
           </Badge>
-          <span className="font-semibold truncate">{group.baseDomain}</span>
+          <span className={cn("font-semibold truncate", resolution === 'delete-all' && "line-through opacity-70")}>{group.baseDomain}</span>
           <span className="text-muted-foreground text-sm ml-auto shrink-0">
             {group.items.length} items
           </span>
@@ -105,17 +104,14 @@ function ConflictCard({
       </CardHeader>
 
       <CardContent className="pt-0">
-        <div className="flex flex-wrap gap-3 mb-4">
+        <div className={cn("flex flex-wrap gap-3 mb-4 transition-opacity", resolution === 'delete-all' && "opacity-40 grayscale")}>
           {group.items.map((item, i) => (
             <ItemCard
               key={item.id}
               item={item}
               label={i === 0 ? 'Option A' : i === 1 ? 'Option B' : `Option ${String.fromCharCode(65 + i)}`}
-              isSelected={
-                (resolution === 'keep-a' && i === 0) ||
-                (resolution === 'keep-b' && i === 1)
-              }
-              onSelect={() => setRes(i === 0 ? 'keep-a' : 'keep-b')}
+              isSelected={resolution === 'keep-item' && group.resolvedItem?.id === item.id}
+              onSelect={() => setRes('keep-item', item)}
             />
           ))}
         </div>
@@ -140,11 +136,20 @@ function ConflictCard({
           <div className="ml-auto flex gap-2">
             <Button
               size="sm"
+              variant={resolution === 'delete-all' ? 'destructive' : 'outline'}
+              className={resolution === 'delete-all' ? '' : 'text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20'}
+              onClick={() => setRes('delete-all')}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete All
+            </Button>
+            <Button
+              size="sm"
               variant={resolution === 'skipped' ? 'secondary' : 'ghost'}
               onClick={() => setRes('skipped')}
             >
               <SkipForward className="w-3.5 h-3.5" />
-              Skip
+              Skip (Keep)
             </Button>
           </div>
         </div>
@@ -173,9 +178,9 @@ export function ConflictReview({ groups, onUpdate, onNavigate }: ConflictReviewP
     setResolvingGroup(null);
   };
 
-  const handleBulkAction = (action: 'keep-all' | 'skipped') => {
+  const handleBulkAction = (action: 'keep-all' | 'skipped' | 'delete-all') => {
     const next = localGroups.map((g) => {
-      if (g.resolution === 'pending') {
+      if (['pending', 'keep-all', 'skipped', 'delete-all'].includes(g.resolution)) {
         return { ...g, resolution: action, resolvedItem: null };
       }
       return g;
@@ -186,6 +191,9 @@ export function ConflictReview({ groups, onUpdate, onNavigate }: ConflictReviewP
 
   const pendingCount = localGroups.filter((g) => g.resolution === 'pending').length;
   const resolvedCount = localGroups.length - pendingCount;
+  const bulkEditableCount = localGroups.filter((g) => 
+    ['pending', 'keep-all', 'skipped', 'delete-all'].includes(g.resolution)
+  ).length;
 
   return (
     <>
@@ -214,13 +222,13 @@ export function ConflictReview({ groups, onUpdate, onNavigate }: ConflictReviewP
               </div>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button 
                 size="sm" 
                 variant="outline" 
                 className="bg-primary/5 border-primary/20 hover:bg-primary/10"
                 onClick={() => handleBulkAction('keep-all')}
-                disabled={pendingCount === 0}
+                disabled={bulkEditableCount === 0}
               >
                 <LayoutGrid className="w-3.5 h-3.5 mr-2" />
                 Keep All Items
@@ -228,9 +236,19 @@ export function ConflictReview({ groups, onUpdate, onNavigate }: ConflictReviewP
               <Button 
                 size="sm" 
                 variant="outline"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20"
+                onClick={() => handleBulkAction('delete-all')}
+                disabled={bulkEditableCount === 0}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-2" />
+                Delete All
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline"
                 className="hover:bg-secondary"
                 onClick={() => handleBulkAction('skipped')}
-                disabled={pendingCount === 0}
+                disabled={bulkEditableCount === 0}
               >
                 <ListChecks className="w-3.5 h-3.5 mr-2" />
                 Skip All

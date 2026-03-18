@@ -57,11 +57,10 @@ export async function buildCleanExport(options: ExportOptions): Promise<any> {
   for (const group of analysis.conflictGroups) {
     const resolved = resolvedMap.get(group.id) ?? group;
     switch (resolved.resolution) {
-      case 'keep-a':
-        finalItems.push(resolved.items[0]);
-        break;
-      case 'keep-b':
-        finalItems.push(resolved.items[1]);
+      case 'keep-item':
+        if (resolved.resolvedItem) {
+          finalItems.push(resolved.resolvedItem);
+        }
         break;
       case 'keep-all':
         finalItems.push(...resolved.items);
@@ -72,6 +71,9 @@ export async function buildCleanExport(options: ExportOptions): Promise<any> {
         } else {
           finalItems.push(...resolved.items);
         }
+        break;
+      case 'delete-all':
+        // Do not push anything -> items are deleted
         break;
       case 'skipped':
       case 'pending':

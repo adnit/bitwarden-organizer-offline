@@ -65,110 +65,148 @@ export function ManualResolutionModal({
               <Type className="w-4 h-4" />
               Field Selection
             </h4>
-            <div className="grid grid-cols-[120px_1fr_1fr] gap-4">
-              <div className="pt-2"></div>
-              {group.items.map((item, idx) => (
-                <div key={item.id} className="text-center">
-                  <Badge variant="secondary" className="mb-2">
-                    Option {String.fromCharCode(65 + idx)}
-                  </Badge>
-                </div>
-              ))}
+            <div className="overflow-x-auto pb-4 custom-scrollbar">
+              <div 
+                className="grid gap-4" 
+                style={{ gridTemplateColumns: `140px repeat(${group.items.length}, minmax(260px, 1fr))` }}
+              >
+                <div className="pt-2"></div>
+                {group.items.map((item, idx) => (
+                  <div key={item.id} className="text-center">
+                    <Badge variant="secondary" className="mb-2">
+                      Option {String.fromCharCode(65 + idx)}
+                    </Badge>
+                  </div>
+                ))}
 
-              {/* Name Field */}
-              <div className="text-sm font-medium pt-2">Item Name</div>
-              {group.items.map((item) => (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  className={cn(
-                    "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center",
-                    editedItem.name === item.name ? "border-primary bg-primary/5" : "hover:border-primary/40"
-                  )}
-                  onClick={() => selectFieldFrom(item, 'name')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      selectFieldFrom(item, 'name');
-                    }
-                  }}
-                >
-                  <span className="truncate w-full">{item.name}</span>
-                </div>
-              ))}
+                {/* Name Field */}
+                <div className="text-sm font-medium pt-2">Item Name</div>
+                {group.items.map((item) => (
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center",
+                      editedItem.name === item.name ? "border-primary bg-primary/5" : "hover:border-primary/40"
+                    )}
+                    onClick={() => selectFieldFrom(item, 'name')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectFieldFrom(item, 'name');
+                      }
+                    }}
+                  >
+                    <span className="truncate w-full">{item.name}</span>
+                  </div>
+                ))}
 
-              {/* Username Field */}
-              <div className="text-sm font-medium pt-2">Username</div>
-              {group.items.map((item) => (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  className={cn(
-                    "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center",
-                    editedItem.login?.username === item.login?.username ? "border-primary bg-primary/5" : "hover:border-primary/40"
-                  )}
-                  onClick={() => selectFieldFrom(item, 'username')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      selectFieldFrom(item, 'username');
-                    }
-                  }}
-                >
-                  <User className="w-3.5 h-3.5 mr-2 shrink-0 text-muted-foreground" />
-                  <span className="truncate font-mono text-xs">{item.login?.username || '(none)'}</span>
-                </div>
-              ))}
+                {/* Username Field */}
+                <div className="text-sm font-medium pt-2">Username</div>
+                {group.items.map((item) => (
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center",
+                      editedItem.login?.username === item.login?.username ? "border-primary bg-primary/5" : "hover:border-primary/40"
+                    )}
+                    onClick={() => selectFieldFrom(item, 'username')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectFieldFrom(item, 'username');
+                      }
+                    }}
+                  >
+                    <User className="w-3.5 h-3.5 mr-2 shrink-0 text-muted-foreground" />
+                    <span className="truncate font-mono text-xs">{item.login?.username || '(none)'}</span>
+                  </div>
+                ))}
 
-              {/* Password Field */}
-              <div className="text-sm font-medium pt-2">Password</div>
-              {group.items.map((item) => (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  className={cn(
-                    "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center",
-                    editedItem.login?.password === item.login?.password ? "border-primary bg-primary/5" : "hover:border-primary/40"
-                  )}
-                  onClick={() => selectFieldFrom(item, 'password')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      selectFieldFrom(item, 'password');
-                    }
-                  }}
-                >
-                  <Key className="w-3.5 h-3.5 mr-2 shrink-0 text-muted-foreground" />
-                  <PasswordDisplay value={item.login?.password} className="w-full justify-start" />
+                {/* Password Field */}
+                <div className="text-sm font-medium pt-2">Password</div>
+                {group.items.map((item) => (
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center",
+                      editedItem.login?.password === item.login?.password ? "border-primary bg-primary/5" : "hover:border-primary/40"
+                    )}
+                    onClick={() => selectFieldFrom(item, 'password')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectFieldFrom(item, 'password');
+                      }
+                    }}
+                  >
+                    <Key className="w-3.5 h-3.5 mr-2 shrink-0 text-muted-foreground" />
+                    <PasswordDisplay value={item.login?.password} className="w-full justify-start" />
+                  </div>
+                ))}
+                
+                {/* URIs Field */}
+                <div className="flex flex-col justify-start pt-2 gap-2 pr-4">
+                  <span className="text-sm font-medium">URIs</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 text-[10px] px-2 w-max"
+                    onClick={() => {
+                      const allUris = new Set<string>();
+                      group.items.forEach(item => {
+                        item.login?.uris?.forEach(u => u.uri && allUris.add(u.uri));
+                      });
+                      const merged = Array.from(allUris).map(uri => ({ match: null, uri }));
+                      setEditedItem(prev => ({
+                        ...prev,
+                        login: prev.login ? { ...prev.login, uris: merged } : prev.login
+                      }));
+                    }}
+                  >
+                    Merge All
+                  </Button>
                 </div>
-              ))}
-              
-              {/* URIs Field */}
-              <div className="text-sm font-medium pt-2">URIs</div>
-              {group.items.map((item) => (
-                <div
-                  key={item.id}
-                  role="button"
-                  tabIndex={0}
-                  className={cn(
-                    "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center",
-                    JSON.stringify(editedItem.login?.uris) === JSON.stringify(item.login?.uris) ? "border-primary bg-primary/5" : "hover:border-primary/40"
-                  )}
-                  onClick={() => selectFieldFrom(item, 'uris')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      selectFieldFrom(item, 'uris');
-                    }
-                  }}
-                >
-                  <Globe className="w-3.5 h-3.5 mr-2 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-xs">{(item.login?.uris?.length ?? 0)} URI(s)</span>
-                </div>
-              ))}
+                {group.items.map((item) => (
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      "h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border-input bg-background hover:bg-accent hover:text-accent-foreground flex flex-col items-start gap-1.5",
+                      JSON.stringify(editedItem.login?.uris) === JSON.stringify(item.login?.uris) ? "border-primary bg-primary/5" : "hover:border-primary/40"
+                    )}
+                    onClick={() => selectFieldFrom(item, 'uris')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectFieldFrom(item, 'uris');
+                      }
+                    }}
+                  >
+                    <div className="flex items-center text-xs text-muted-foreground pb-1 border-b border-border/50 w-full">
+                      <Globe className="w-3.5 h-3.5 mr-2 shrink-0" />
+                      {(item.login?.uris?.length ?? 0)} URI(s)
+                    </div>
+                    {item.login?.uris && item.login.uris.length > 0 ? (
+                      <div className="flex flex-col gap-1 w-full mt-1">
+                        {item.login.uris.map((u, i) => (
+                          <span key={i} className="truncate text-xs font-mono w-[220px]" title={u.uri || ''}>
+                            {u.uri}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground italic text-xs mt-1">None</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -218,7 +256,26 @@ export function ManualResolutionModal({
                   <Key className="absolute right-3 top-2.5 w-4 h-4 text-muted-foreground opacity-50" />
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 flex flex-col justify-start">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground px-1 flex items-center justify-between">
+                  <span>URIs ({editedItem.login?.uris?.length || 0})</span>
+                </label>
+                <div 
+                  className="flex flex-col gap-1 min-h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-xs font-mono opacity-70 cursor-not-allowed overflow-y-auto max-h-[100px]"
+                  title="Combined URIs for this item"
+                >
+                  {editedItem.login?.uris && editedItem.login.uris.length > 0 ? (
+                    editedItem.login.uris.map((u, idx) => (
+                      <span key={idx} className="truncate w-full block">
+                        {u.uri}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="italic text-muted-foreground">None</span>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2 col-span-2">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground px-1">Note (Optional)</label>
                 <Input
                   value={editedItem.notes || ''}

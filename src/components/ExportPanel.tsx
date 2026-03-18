@@ -56,8 +56,10 @@ export function ExportPanel({
   const resolvedMap = new Map<string, ConflictGroup>(resolvedConflicts.map((g) => [g.id, g]));
   for (const group of analysis.conflictGroups) {
     const resolved = resolvedMap.get(group.id) ?? group;
-    if (['keep-a', 'keep-b', 'custom'].includes(resolved.resolution!)) {
+    if (['keep-item', 'custom'].includes(resolved.resolution!)) {
       finalItemCount += 1;
+    } else if (resolved.resolution === 'delete-all') {
+      // Add nothing
     } else {
       finalItemCount += resolved.items.length; // keep-all, skipped, pending
     }

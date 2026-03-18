@@ -134,7 +134,7 @@ export interface ConflictGroup {
   resolution: ConflictResolution;
 }
 
-export type ConflictResolution = 'keep-a' | 'keep-b' | 'keep-all' | 'custom' | 'skipped' | 'pending';
+export type ConflictResolution = 'keep-item' | 'keep-all' | 'custom' | 'skipped' | 'pending' | 'delete-all';
 
 /** A group of items sharing the same password across DIFFERENT base domains */
 export interface PasswordReuseGroup {
