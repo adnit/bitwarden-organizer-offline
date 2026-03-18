@@ -12,6 +12,8 @@ interface ExportOptions {
   autoMergeGroups: AutoMergeGroup[];
   resolvedConflicts: ConflictGroup[];
   applyAutoMerges: boolean;
+  encrypted?: boolean;
+  password?: string;
 }
 
 /**
@@ -23,8 +25,8 @@ interface ExportOptions {
  *  - PasswordReuse → untouched (user is just informed)
  *  - Clean items → kept as-is
  */
-export function buildCleanExport(options: ExportOptions): BitwardenExport {
-  const { rawExport, analysis, autoMergeGroups, resolvedConflicts, applyAutoMerges } = options;
+export async function buildCleanExport(options: ExportOptions): Promise<any> {
+  const { rawExport, analysis, autoMergeGroups, resolvedConflicts, applyAutoMerges, encrypted, password } = options;
 
   const finalItems: VaultItem[] = [];
 
@@ -80,11 +82,20 @@ export function buildCleanExport(options: ExportOptions): BitwardenExport {
     }
   }
 
-  return {
+  const cleanPayload = {
     encrypted: false,
     folders: rawExport.folders,
     items: finalItems,
   };
+
+  if (encrypted && password) {
+    // Dynamic import to avoid circular dependencies or bloating non-crypto paths
+    const { encryptVault } = await import('./bitwardenCrypto');
+    const plaintextJson = JSON.stringify(cleanPayload);
+    return await encryptVault(plaintextJson, password);
+  }
+
+  return cleanPayload;
 }
 
 /**
