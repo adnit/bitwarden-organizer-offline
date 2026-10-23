@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, User, Key, Globe, SkipForward, LayoutGrid, ListChecks, Settings2, Trash2 } from 'lucide-react';
+import { Check, Copy, User, Key, Globe, SkipForward, LayoutGrid, ListChecks, Settings2, Trash2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -9,6 +9,8 @@ import { cn } from '../lib/utils';
 import { PasswordDisplay } from './PasswordDisplay';
 import { UrlDisplay } from './UrlDisplay';
 import { ManualResolutionModal } from './ManualResolutionModal';
+import { PasskeyBadge } from './PasskeyBadge';
+import { itemsWithLostPasskeys } from '../lib/passkeys';
 
 interface ConflictReviewProps {
   groups: ConflictGroup[];
@@ -38,7 +40,10 @@ function ItemCard({
       onClick={onSelect}
     >
       <div className="flex items-center justify-between mb-3">
-        <Badge variant={isSelected ? 'default' : 'secondary'}>{label}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={isSelected ? 'default' : 'secondary'}>{label}</Badge>
+          <PasskeyBadge item={item} />
+        </div>
         {isSelected && <Check className="w-4 h-4 text-primary" />}
       </div>
       <p className="font-semibold text-foreground mb-3 truncate" title={item.name}>{item.name}</p>
@@ -80,6 +85,12 @@ function ConflictCard({
   };
 
   const isPending = resolution === 'pending';
+  const lostPasskeyItems =
+    resolution === 'keep-item' || resolution === 'custom'
+      ? itemsWithLostPasskeys(group.items, group.resolvedItem)
+      : resolution === 'delete-all'
+        ? itemsWithLostPasskeys(group.items, null)
+        : [];
 
   return (
     <Card
@@ -115,6 +126,17 @@ function ConflictCard({
             />
           ))}
         </div>
+
+        {lostPasskeyItems.length > 0 && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              This choice will discard the passkey stored on{' '}
+              {lostPasskeyItems.map((i) => `"${i.name}"`).join(', ')}. Passkeys cannot be recovered
+              once removed — choose "Keep All" if you still need it.
+            </span>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2 items-center">
           <Button

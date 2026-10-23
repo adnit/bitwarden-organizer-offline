@@ -15,6 +15,8 @@ const steps: { id: AppStep; label: string }[] = [
   { id: 'auto-merge', label: 'Duplicates' },
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'password-reuse', label: 'Security' },
+  { id: 'swipe', label: 'Quick Review' },
+  { id: 'folders', label: 'Folders' },
   { id: 'export', label: 'Export' },
 ];
 

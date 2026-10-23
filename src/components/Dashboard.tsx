@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   FileText,
   ArrowRight,
+  Layers,
+  FolderTree,
 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
@@ -157,6 +159,34 @@ export function Dashboard({ analysis, fileName, onNavigate }: DashboardProps) {
           actionLabel={reuseGroups > 0 ? 'View security audit' : undefined}
           disabled={reuseGroups === 0}
         />
+      </div>
+
+      {/* Tidy-up tools */}
+      <div className="grid sm:grid-cols-2 gap-4 mb-8">
+        <Card className="cursor-pointer border-purple-500/20 hover:scale-[1.01] transition-all" onClick={() => onNavigate('swipe')}>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+              <Layers className="w-5 h-5 text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground text-sm">Quick Review</p>
+              <p className="text-xs text-muted-foreground">Swipe through items: right to keep, left to delete.</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer border-blue-500/20 hover:scale-[1.01] transition-all" onClick={() => onNavigate('folders')}>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <FolderTree className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground text-sm">Organize Folders</p>
+              <p className="text-xs text-muted-foreground">Create folders, move items, or let it suggest folders.</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
       </div>
 
       {/* All-Clear Banner */}

@@ -1,23 +1,33 @@
 import type {
   BitwardenExport,
+  BitwardenFolder,
+  FolderAssignments,
+  SwipeDecisions,
   VaultItem,
   VaultAnalysis,
   ConflictGroup,
   AutoMergeGroup,
 } from '../types/bitwarden';
 
-interface ExportOptions {
-  rawExport: BitwardenExport;
+interface ResolvedItemsOptions {
   analysis: VaultAnalysis;
   autoMergeGroups: AutoMergeGroup[];
   resolvedConflicts: ConflictGroup[];
-  applyAutoMerges: boolean;
+  applyAutoMerges?: boolean;
+}
+
+interface ExportOptions extends ResolvedItemsOptions {
+  rawExport: BitwardenExport;
+  /** Folder list to export; defaults to the original folders. */
+  folders?: BitwardenFolder[];
+  folderAssignments?: FolderAssignments;
+  swipeDecisions?: SwipeDecisions;
   encrypted?: boolean;
   password?: string;
 }
 
 /**
- * Builds a clean Bitwarden-compatible export object.
+ * Returns the vault items after merges and conflict resolutions are applied.
  *
  * Logic:
  *  - Auto-merge groups → handled based on individual resolution (approved/skipped/manual)
@@ -25,8 +35,8 @@ interface ExportOptions {
  *  - PasswordReuse → untouched (user is just informed)
  *  - Clean items → kept as-is
  */
-export async function buildCleanExport(options: ExportOptions): Promise<any> {
-  const { rawExport, analysis, autoMergeGroups, resolvedConflicts, applyAutoMerges, encrypted, password } = options;
+export function computeResolvedItems(options: ResolvedItemsOptions): VaultItem[] {
+  const { analysis, autoMergeGroups, resolvedConflicts, applyAutoMerges = true } = options;
 
   const finalItems: VaultItem[] = [];
 
@@ -84,9 +94,46 @@ export async function buildCleanExport(options: ExportOptions): Promise<any> {
     }
   }
 
+  return finalItems;
+}
+
+/**
+ * Applies swipe-review deletions and folder changes on top of the resolved items.
+ * Items pointing at a folder that no longer exists are moved to "No folder".
+ */
+export function applyOrganization(
+  items: VaultItem[],
+  folders: BitwardenFolder[],
+  folderAssignments: FolderAssignments = {},
+  swipeDecisions: SwipeDecisions = {},
+): VaultItem[] {
+  const folderIds = new Set(folders.map((f) => f.id));
+  return items
+    .filter((item) => swipeDecisions[item.id] !== 'delete')
+    .map((item) => {
+      const folderId = item.id in folderAssignments ? folderAssignments[item.id] : item.folderId;
+      const validFolderId = folderId && folderIds.has(folderId) ? folderId : null;
+      return validFolderId === item.folderId ? item : { ...item, folderId: validFolderId };
+    });
+}
+
+/**
+ * Builds a clean Bitwarden-compatible export object.
+ */
+export async function buildCleanExport(options: ExportOptions): Promise<any> {
+  const { rawExport, folderAssignments, swipeDecisions, encrypted, password } = options;
+  const folders = options.folders ?? rawExport.folders;
+  const finalItems = applyOrganization(
+    computeResolvedItems(options),
+    folders,
+    folderAssignments,
+    swipeDecisions,
+  );
+
   const cleanPayload = {
     encrypted: false,
-    folders: rawExport.folders,
+    folders,
+    ...(rawExport.collections ? { collections: rawExport.collections } : {}),
     items: finalItems,
   };
 

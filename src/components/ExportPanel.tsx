@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   CheckCircle2,
   GitMerge,
@@ -7,14 +7,25 @@ import {
   AlertTriangle,
   ArrowLeft,
   Lock,
-  Unlock
+  Unlock,
+  Trash2,
+  FolderTree,
 } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import type { VaultAnalysis, BitwardenExport, ConflictGroup, AppStep, AutoMergeGroup } from '../types/bitwarden';
-import { buildCleanExport, downloadExport } from '../lib/exportVault';
+import type {
+  VaultAnalysis,
+  BitwardenExport,
+  ConflictGroup,
+  AppStep,
+  AutoMergeGroup,
+  BitwardenFolder,
+  FolderAssignments,
+  SwipeDecisions,
+} from '../types/bitwarden';
+import { applyOrganization, buildCleanExport, computeResolvedItems, downloadExport } from '../lib/exportVault';
 import { ExportPasswordModal } from './ExportPasswordModal';
 
 interface ExportPanelProps {
@@ -22,6 +33,9 @@ interface ExportPanelProps {
   analysis: VaultAnalysis;
   autoMergeGroups: AutoMergeGroup[];
   resolvedConflicts: ConflictGroup[];
+  folders: BitwardenFolder[];
+  folderAssignments: FolderAssignments;
+  swipeDecisions: SwipeDecisions;
   fileName: string;
   onNavigate: (step: AppStep) => void;
   onReset: () => void;
@@ -32,6 +46,9 @@ export function ExportPanel({
   analysis,
   autoMergeGroups,
   resolvedConflicts,
+  folders,
+  folderAssignments,
+  swipeDecisions,
   fileName,
   onNavigate,
   onReset,
@@ -45,25 +62,16 @@ export function ExportPanel({
   const duplicatesRemoved = approvedMerges.reduce((s, g) => s + g.items.length - 1, 0);
   const pendingConflicts = resolvedConflicts.filter((g) => g.resolution === 'pending').length;
 
-  // Manually compute final item count for performance (instead of building entire payload on render)
-  let finalItemCount = analysis.cleanItems.length;
-  const groupsToUse = autoMergeGroups.length > 0 ? autoMergeGroups : analysis.autoMergeGroups;
-  for (const group of groupsToUse) {
-    if (group.resolution === 'approved') finalItemCount += 1;
-    else if (group.resolution === 'manual' && group.customItem) finalItemCount += 1;
-    else finalItemCount += group.items.length;
-  }
-  const resolvedMap = new Map<string, ConflictGroup>(resolvedConflicts.map((g) => [g.id, g]));
-  for (const group of analysis.conflictGroups) {
-    const resolved = resolvedMap.get(group.id) ?? group;
-    if (['keep-item', 'custom'].includes(resolved.resolution!)) {
-      finalItemCount += 1;
-    } else if (resolved.resolution === 'delete-all') {
-      // Add nothing
-    } else {
-      finalItemCount += resolved.items.length; // keep-all, skipped, pending
-    }
-  }
+  const { finalItemCount, swipeDeletedCount, folderChangeCount } = useMemo(() => {
+    const resolved = computeResolvedItems({ analysis, autoMergeGroups, resolvedConflicts });
+    const organized = applyOrganization(resolved, folders, folderAssignments, swipeDecisions);
+    const before = new Map(resolved.map((i) => [i.id, i.folderId]));
+    return {
+      finalItemCount: organized.length,
+      swipeDeletedCount: resolved.length - organized.length,
+      folderChangeCount: organized.filter((i) => before.get(i.id) !== i.folderId).length,
+    };
+  }, [analysis, autoMergeGroups, resolvedConflicts, folders, folderAssignments, swipeDecisions]);
 
   const outputFileName = fileName.replace(/\.json$/i, '_clean.json');
 
@@ -76,6 +84,9 @@ export function ExportPanel({
         autoMergeGroups,
         resolvedConflicts,
         applyAutoMerges: true,
+        folders,
+        folderAssignments,
+        swipeDecisions,
         encrypted,
         password
       });
@@ -143,6 +154,26 @@ export function ExportPanel({
                   Duplicates removed
                 </div>
                 <Badge variant="success">−{duplicatesRemoved}</Badge>
+              </div>
+            )}
+
+            {swipeDeletedCount > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-red-400">
+                  <Trash2 className="w-4 h-4" />
+                  Deleted in Quick Review
+                </div>
+                <Badge variant="destructive">−{swipeDeletedCount}</Badge>
+              </div>
+            )}
+
+            {folderChangeCount > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-blue-400">
+                  <FolderTree className="w-4 h-4" />
+                  Items moved to a different folder
+                </div>
+                <Badge>{folderChangeCount}</Badge>
               </div>
             )}
 

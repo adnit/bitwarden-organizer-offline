@@ -59,5 +59,6 @@ export function parseVaultJson(jsonText: string): VaultParseResult {
     encrypted: false,
     folders: Array.isArray(data.folders) ? data.folders : [],
     items: data.items as VaultItem[],
+    ...(Array.isArray(data.collections) ? { collections: data.collections } : {}),
   };
 }

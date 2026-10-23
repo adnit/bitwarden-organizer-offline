@@ -122,8 +122,8 @@ export function PasswordReusePanel({ groups, onNavigate }: PasswordReusePanelPro
         <Button variant="outline" onClick={() => onNavigate('dashboard')}>
           ← Dashboard
         </Button>
-        <Button onClick={() => onNavigate('export')}>
-          Export Clean Vault →
+        <Button onClick={() => onNavigate('swipe')}>
+          Next: Quick Review →
         </Button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Check, ArrowRight, User, Key, Globe, Type } from 'lucide-react';
+import { X, Check, ArrowRight, User, Key, Globe, Type, Fingerprint, Timer } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -8,6 +8,10 @@ import { Separator } from './ui/separator';
 import type { VaultItem, ConflictGroup } from '../types/bitwarden';
 import { cn } from '../lib/utils';
 import { PasswordDisplay } from './PasswordDisplay';
+import { getPasskeys, hasPasskey } from '../lib/passkeys';
+
+const optionClass =
+  'h-auto py-2 px-3 justify-start text-left font-normal border-2 transition-all rounded-md cursor-pointer ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border-input bg-background hover:bg-accent hover:text-accent-foreground flex items-center';
 
 interface ManualResolutionModalProps {
   group: ConflictGroup;
@@ -20,12 +24,28 @@ export function ManualResolutionModal({
   onResolve,
   onCancel,
 }: ManualResolutionModalProps) {
-  const [editedItem, setEditedItem] = useState<VaultItem>({
-    ...group.items[0],
-    id: crypto.randomUUID(),
+  const [editedItem, setEditedItem] = useState<VaultItem>(() => {
+    const base = group.items[0];
+    // Don't lose a passkey or TOTP secret just because it lives on another option
+    const passkeySource = group.items.find(hasPasskey);
+    const totpSource = group.items.find((i) => i.login?.totp);
+    return {
+      ...base,
+      id: crypto.randomUUID(),
+      login: base.login
+        ? {
+            ...base.login,
+            fido2Credentials: passkeySource ? getPasskeys(passkeySource) : base.login.fido2Credentials,
+            totp: totpSource?.login?.totp ?? base.login.totp,
+          }
+        : base.login,
+    };
   });
+  const showPasskeyRow = group.items.some(hasPasskey);
+  const showTotpRow = group.items.some((i) => i.login?.totp);
+  const selectedPasskeyId = getPasskeys(editedItem)[0]?.credentialId ?? null;
 
-  const selectFieldFrom = (item: VaultItem, field: 'name' | 'username' | 'password' | 'uris' | 'folderId') => {
+  const selectFieldFrom = (item: VaultItem, field: 'name' | 'username' | 'password' | 'uris' | 'folderId' | 'passkey' | 'totp') => {
     setEditedItem(prev => {
       const next = { ...prev };
       if (field === 'name') next.name = item.name;
@@ -38,6 +58,12 @@ export function ManualResolutionModal({
       }
       if (field === 'uris' && next.login) {
         next.login = { ...next.login, uris: item.login?.uris ?? [] };
+      }
+      if (field === 'passkey' && next.login) {
+        next.login = { ...next.login, fido2Credentials: getPasskeys(item) };
+      }
+      if (field === 'totp' && next.login) {
+        next.login = { ...next.login, totp: item.login?.totp ?? null };
       }
       return next;
     });
@@ -150,6 +176,65 @@ export function ManualResolutionModal({
                   </div>
                 ))}
                 
+                {/* Passkey Field */}
+                {showPasskeyRow && (
+                  <>
+                    <div className="text-sm font-medium pt-2">Passkey</div>
+                    {group.items.map((item) => {
+                      const cred = getPasskeys(item)[0];
+                      const isSelected = cred ? cred.credentialId === selectedPasskeyId : selectedPasskeyId === null;
+                      return (
+                        <div
+                          key={item.id}
+                          role="button"
+                          tabIndex={0}
+                          className={cn(optionClass, isSelected ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}
+                          onClick={() => selectFieldFrom(item, 'passkey')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              selectFieldFrom(item, 'passkey');
+                            }
+                          }}
+                        >
+                          <Fingerprint className="w-3.5 h-3.5 mr-2 shrink-0 text-muted-foreground" />
+                          <span className="truncate text-xs">
+                            {cred ? `${cred.rpId || cred.rpName || 'Passkey'}${cred.userName ? ` · ${cred.userName}` : ''}` : '(none)'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* TOTP Field */}
+                {showTotpRow && (
+                  <>
+                    <div className="text-sm font-medium pt-2">Authenticator (TOTP)</div>
+                    {group.items.map((item) => (
+                      <div
+                        key={item.id}
+                        role="button"
+                        tabIndex={0}
+                        className={cn(
+                          optionClass,
+                          (editedItem.login?.totp ?? null) === (item.login?.totp ?? null) ? 'border-primary bg-primary/5' : 'hover:border-primary/40',
+                        )}
+                        onClick={() => selectFieldFrom(item, 'totp')}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            selectFieldFrom(item, 'totp');
+                          }
+                        }}
+                      >
+                        <Timer className="w-3.5 h-3.5 mr-2 shrink-0 text-muted-foreground" />
+                        <PasswordDisplay value={item.login?.totp} className="w-full justify-start" />
+                      </div>
+                    ))}
+                  </>
+                )}
+
                 {/* URIs Field */}
                 <div className="flex flex-col justify-start pt-2 gap-2 pr-4">
                   <span className="text-sm font-medium">URIs</span>

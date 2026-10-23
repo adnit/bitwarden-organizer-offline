@@ -14,6 +14,24 @@ export interface BitwardenLogin {
   username: string | null;
   password: string | null;
   totp: string | null;
+  fido2Credentials?: BitwardenFido2Credential[] | null;
+}
+
+/** A passkey stored on a login item. Bitwarden currently supports one per login. */
+export interface BitwardenFido2Credential {
+  credentialId: string;
+  keyType: string;
+  keyAlgorithm: string;
+  keyCurve: string;
+  keyValue: string;
+  rpId: string;
+  userHandle: string | null;
+  userName: string | null;
+  counter: string;
+  rpName: string | null;
+  userDisplayName: string | null;
+  discoverable: string;
+  creationDate: string;
 }
 
 export interface BitwardenCard {
@@ -100,6 +118,8 @@ export interface BitwardenExport {
   data?: string; // encrypted payload
   folders: BitwardenFolder[];
   items: VaultItem[];
+  /** Present in organization exports */
+  collections?: unknown[];
 }
 
 // ============================================================
@@ -121,6 +141,11 @@ export interface AutoMergeGroup {
   customItem: VaultItem | null;
   /** Whether to merge or keep separate */
   resolution: AutoMergeResolution;
+  /**
+   * True when the source items hold more than one distinct passkey.
+   * Bitwarden only supports one passkey per login, so merging would drop some.
+   */
+  hasPasskeyConflict: boolean;
 }
 
 /** A conflict group: same base domain, different username OR password */
@@ -162,7 +187,16 @@ export type AppStep =
   | 'auto-merge'
   | 'conflicts'
   | 'password-reuse'
+  | 'swipe'
+  | 'folders'
   | 'export';
+
+/** Keep/delete decisions from the swipe review, keyed by item ID. */
+export type SwipeDecision = 'keep' | 'delete';
+export type SwipeDecisions = Record<string, SwipeDecision>;
+
+/** Folder overrides from the folder organizer: item ID → folder ID (null = no folder). */
+export type FolderAssignments = Record<string, string | null>;
 
 export interface AppState {
   step: AppStep;

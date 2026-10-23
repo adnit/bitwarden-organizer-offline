@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GitMerge, Link, User, Key, CheckCircle2, ChevronDown, ChevronUp, Edit2, ListX } from 'lucide-react';
+import { GitMerge, Link, User, Key, CheckCircle2, ChevronDown, ChevronUp, Edit2, ListX, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -9,6 +9,7 @@ import { PasswordDisplay } from './PasswordDisplay';
 import { UrlDisplay } from './UrlDisplay';
 import { cn } from '../lib/utils';
 import { EditMergedItemModal } from './EditMergedItemModal';
+import { PasskeyBadge } from './PasskeyBadge';
 
 interface AutoMergePanelProps {
   groups: AutoMergeGroup[];
@@ -29,7 +30,8 @@ function GroupCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const status = group.resolution;
-  const allUris = (group.resolution === 'manual' ? group.customItem : group.mergedItem)?.login?.uris ?? [];
+  const resultItem = group.resolution === 'manual' ? group.customItem : group.mergedItem;
+  const allUris = resultItem?.login?.uris ?? [];
 
   const updateStatus = (res: AutoMergeGroup['resolution']) => {
     onUpdate({ ...group, resolution: res });
@@ -88,7 +90,19 @@ function GroupCard({
             <Link className="w-3.5 h-3.5" />
             <span className="text-xs">{allUris.length} URI{allUris.length !== 1 ? 's' : ''} merged</span>
           </div>
+          <PasskeyBadge item={resultItem} />
         </div>
+
+        {group.hasPasskeyConflict && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              These items hold different passkeys. Bitwarden supports only one passkey per login, so
+              this merge was skipped by default to avoid losing any. Approve only if you know which
+              passkeys you still need.
+            </span>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2 items-center">
           <Button
@@ -134,7 +148,10 @@ function GroupCard({
                   key={item.id}
                   className="rounded-lg bg-secondary/30 border border-border/50 px-3 py-2"
                 >
-                  <p className="font-medium text-foreground text-xs truncate" title={item.name}>{item.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-foreground text-xs truncate" title={item.name}>{item.name}</p>
+                    <PasskeyBadge item={item} />
+                  </div>
                   <UrlDisplay url={item.login?.uris?.[0]?.uri} className="opacity-80" />
                 </div>
               ))}

@@ -1,6 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import type {
   VaultItem,
+  BitwardenUri,
+  BitwardenField,
+  BitwardenPasswordHistory,
   BitwardenExport,
   VaultAnalysis,
   AutoMergeGroup,
@@ -8,6 +11,7 @@ import type {
   PasswordReuseGroup,
 } from '../types/bitwarden';
 import { extractBaseDomain } from './domainUtils';
+import { collectDistinctPasskeys } from './passkeys';
 
 /** Returns the primary URI string for a login item, or null. */
 function primaryUri(item: VaultItem): string | null {
@@ -21,7 +25,8 @@ function autoMergeKey(domain: string, username: string, password: string): strin
 
 /**
  * Merges multiple VaultItems into a single item.
- * Combines all unique URIs and picks the most-recently-created item as the base.
+ * The most-recently-created item is the base; URIs, passkeys, custom fields,
+ * notes and password history from every item are combined so nothing is lost.
  */
 function mergeItems(items: VaultItem[]): VaultItem {
   // Sort by creation date descending – newest first
@@ -32,22 +37,46 @@ function mergeItems(items: VaultItem[]): VaultItem {
   });
 
   const base = sorted[0];
-  const allUriStrings = new Set<string>();
+  const urisByString = new Map<string, BitwardenUri>();
+  const fieldsByKey = new Map<string, BitwardenField>();
+  const historyByPassword = new Map<string, BitwardenPasswordHistory>();
+  const notes = new Set<string>();
+  let totp: string | null = null;
+
   for (const item of sorted) {
     for (const u of item.login?.uris ?? []) {
-      if (u.uri) allUriStrings.add(u.uri);
+      if (u.uri && !urisByString.has(u.uri)) urisByString.set(u.uri, u);
     }
+    if (!totp && item.login?.totp) totp = item.login.totp;
+    for (const f of item.fields ?? []) {
+      const key = JSON.stringify([f.name, f.value, f.type]);
+      if (!fieldsByKey.has(key)) fieldsByKey.set(key, f);
+    }
+    for (const h of item.passwordHistory ?? []) {
+      if (h.password && !historyByPassword.has(h.password)) historyByPassword.set(h.password, h);
+    }
+    if (item.notes?.trim()) notes.add(item.notes.trim());
   }
 
-  const mergedUris = Array.from(allUriStrings).map((uri) => ({ match: null, uri }));
+  const passkeys = collectDistinctPasskeys(sorted);
+  const fields = Array.from(fieldsByKey.values());
+  const passwordHistory = Array.from(historyByPassword.values()).sort((a, b) =>
+    b.lastUsedDate.localeCompare(a.lastUsedDate),
+  );
 
   return {
     ...base,
     id: uuidv4(),
+    notes: notes.size > 0 ? Array.from(notes).join('\n\n---\n\n') : base.notes,
+    favorite: sorted.some((i) => i.favorite),
+    fields: fields.length > 0 ? fields : base.fields,
+    passwordHistory: passwordHistory.length > 0 ? passwordHistory : base.passwordHistory,
     login: base.login
       ? {
           ...base.login,
-          uris: mergedUris,
+          uris: Array.from(urisByString.values()),
+          totp,
+          fido2Credentials: passkeys.length > 0 ? passkeys : base.login.fido2Credentials,
         }
       : null,
     // Keep the earliest creation date
@@ -92,6 +121,9 @@ export function analyzeVault(exportData: BitwardenExport): VaultAnalysis {
   const autoMergeGroups: AutoMergeGroup[] = [];
   const conflictGroups: ConflictGroup[] = [];
   const processedItemIds = new Set<string>();
+  // Auto-merge groups that ended up inside a conflict group. The conflict
+  // resolution decides their fate, so they must not also be exported on their own.
+  const absorbedMergeGroupIds = new Set<string>();
 
   // --- Step 2: Within each domain, handle auto-merges and conflicts ---
   for (const [domain, items] of domainMap.entries()) {
@@ -109,13 +141,16 @@ export function analyzeVault(exportData: BitwardenExport): VaultAnalysis {
 
     // itemsToProcess will contain one "representative" item per auto-merge group
     const representatives: VaultItem[] = [];
-    const representativeToOriginals = new Map<string, VaultItem[]>();
+    const autoMergeGroupByRepId = new Map<string, AutoMergeGroup>();
 
     for (const [key, groupItems] of subGroups.entries()) {
       if (groupItems.length > 1) {
         const merged = mergeItems(groupItems);
         const [, username, password] = key.split('||');
-        autoMergeGroups.push({
+        // Bitwarden holds one passkey per login, so don't silently merge items
+        // carrying different passkeys – the user has to decide.
+        const hasPasskeyConflict = collectDistinctPasskeys(groupItems).length > 1;
+        const group: AutoMergeGroup = {
           id: uuidv4(),
           baseDomain: domain,
           username,
@@ -123,16 +158,17 @@ export function analyzeVault(exportData: BitwardenExport): VaultAnalysis {
           items: groupItems,
           mergedItem: merged,
           customItem: null,
-          resolution: 'approved',
-        });
+          resolution: hasPasskeyConflict ? 'skipped' : 'approved',
+          hasPasskeyConflict,
+        };
+        autoMergeGroups.push(group);
         for (const i of groupItems) processedItemIds.add(i.id);
-        
+
         // We use the merged item as the representative for conflict checking
         representatives.push(merged);
-        representativeToOriginals.set(merged.id, groupItems);
+        autoMergeGroupByRepId.set(merged.id, group);
       } else {
         representatives.push(groupItems[0]);
-        representativeToOriginals.set(groupItems[0].id, groupItems);
       }
     }
 
@@ -167,18 +203,31 @@ export function analyzeVault(exportData: BitwardenExport): VaultAnalysis {
 
     // Find connected components
     const visited = new Set<string>();
+    const repById = new Map(representatives.map((r) => [r.id, r]));
     for (const rep of representatives) {
       if (visited.has(rep.id)) continue;
       if (!adj.has(rep.id)) continue; // No conflicts for this item
 
       const component: VaultItem[] = [];
+      const absorbed: string[] = [];
       const queue = [rep.id];
       visited.add(rep.id);
 
       while (queue.length > 0) {
         const currentId = queue.shift()!;
-        // Add all original items belonging to this representative
-        component.push(...(representativeToOriginals.get(currentId) || []));
+        const current = repById.get(currentId)!;
+        const absorbedGroup = autoMergeGroupByRepId.get(currentId);
+        if (absorbedGroup && absorbedGroup.hasPasskeyConflict) {
+          // Keep the originals so each passkey stays selectable in the conflict
+          component.push(...absorbedGroup.items);
+          absorbed.push(absorbedGroup.id);
+        } else if (absorbedGroup) {
+          // The merged duplicate stands in for its originals in the conflict.
+          component.push(current);
+          absorbed.push(absorbedGroup.id);
+        } else {
+          component.push(current);
+        }
 
         for (const neighborId of adj.get(currentId) || []) {
           if (!visited.has(neighborId)) {
@@ -197,6 +246,7 @@ export function analyzeVault(exportData: BitwardenExport): VaultAnalysis {
           resolution: 'pending',
         });
         for (const i of component) processedItemIds.add(i.id);
+        for (const id of absorbed) absorbedMergeGroupIds.add(id);
       }
     }
   }
@@ -237,17 +287,13 @@ export function analyzeVault(exportData: BitwardenExport): VaultAnalysis {
 
   // --- Step 4: Collect clean items ---
   const cleanItems = [
-    ...loginItems.filter((i) => !processedItemIds.has(i.id) && (() => {
-      const uri = primaryUri(i);
-      const domain = uri ? extractBaseDomain(uri) : null;
-      return domainMap.get(domain ?? '') === undefined || (domainMap.get(domain ?? '') ?? []).length === 1;
-    })()),
+    ...loginItems.filter((i) => !processedItemIds.has(i.id)),
     ...nonLoginItems,
   ];
 
   return {
     totalItems: exportData.items.length,
-    autoMergeGroups,
+    autoMergeGroups: autoMergeGroups.filter((g) => !absorbedMergeGroupIds.has(g.id)),
     conflictGroups,
     passwordReuseGroups,
     cleanItems,
